@@ -23,12 +23,12 @@ COMMENT ON COLUMN Cards.Customer_ID IS 'One customer can own several cards';
 --#3 Transactions Table
 DROP TABLE IF EXISTS Transactions CASCADE;
 CREATE TABLE Transactions (
-    Transaction_ID SERIAL PRIMARY KEY,
+    Transaction_ID BIGINT PRIMARY KEY,
     Customer_Card_ID BIGINT NOT NULL,
-    CONSTRAINT fk_card_id FOREIGN KEY (Customer_Card_ID) REFERENCES Cards (Customer_Card_ID),
     Transaction_Summ NUMERIC(10,2) NOT NULL,
     Transaction_DateTime TIMESTAMP(0)  WITHOUT TIME ZONE,
-    Transaction_Store_ID VARCHAR NOT NULL
+    Transaction_Store_ID VARCHAR NOT NULL,
+    FOREIGN KEY (Customer_Card_ID) REFERENCES Cards (Customer_Card_ID)
 );
 COMMENT ON COLUMN Transactions.Transaction_ID IS 'Unique value';
 COMMENT ON COLUMN Transactions.Transaction_Summ IS 'Transaction sum in rubles(full purchase price excluding discounts)';
@@ -56,7 +56,7 @@ COMMENT ON COLUMN SKU.Group_ID IS 'The ID of the group of related products to wh
 --#4 Checks
 DROP TABLE IF EXISTS Checks;
 CREATE TABLE Checks (
-    Transaction_ID BIGINT NOT NULL PRIMARY KEY,
+    Transaction_ID BIGINT NOT NULL,
     SKU_ID BIGINT NOT NULL,
     SKU_Amount REAL NOT NULL,
     SKU_Summ REAL NOT NULL,
@@ -74,7 +74,7 @@ COMMENT ON COLUMN Checks.SKU_Discount IS 'The size of the discount granted for t
 --#6 Stores Table
 DROP TABLE IF EXISTS Stores CASCADE;
 CREATE TABLE Stores (
-    Transaction_Store_ID BIGINT NOT NULL PRIMARY KEY,
+    Transaction_Store_ID BIGINT NOT NULL,
     SKU_ID BIGINT NOT NULL,
     SKU_Purchase_Price NUMERIC NOT NULL,
     CONSTRAINT fk_sku_id FOREIGN KEY (SKU_ID) REFERENCES SKU (SKU_ID),
@@ -115,11 +115,11 @@ CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAU
 
 -- Data import from datasets
 SET DATESTYLE to iso, DMY;
-CALL import('Personal_Data', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Personal_Data.tsv');
-CALL import('Cards', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Cards.tsv');
-CALL import('Transactions', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Transactions.tsv');
-CALL import('Groups_SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Groups_SKU.tsv');
-CALL import('SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/SKU.tsv');
-CALL import('Checks', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Checks.tsv');
-CALL import('Date_Of_Analysis_Formation', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Date_Of_Analysis_Formation.tsv');
-CALL import('Stores', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-1/datasets/Stores.tsv');
+CALL import('Personal_Data', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Personal_Data.tsv');
+CALL import('Cards', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Cards.tsv');
+CALL import('Transactions', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Transactions.tsv');
+CALL import('Groups_SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Groups_SKU.tsv');
+CALL import('SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/SKU.tsv');
+CALL import('Checks', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Checks.tsv');
+CALL import('Date_Of_Analysis_Formation', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Date_Of_Analysis_Formation.tsv');
+CALL import('Stores', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Stores.tsv');
