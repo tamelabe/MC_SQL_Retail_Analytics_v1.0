@@ -90,7 +90,6 @@ CREATE TABLE Date_Of_Analysis_Formation (
 );
 
 --Procedure for import
-DROP PROCEDURE IF EXISTS import();
 CREATE OR REPLACE PROCEDURE import(table_name varchar, path text, sep char DEFAULT '\t')
     LANGUAGE plpgsql AS $$
     BEGIN
@@ -102,7 +101,6 @@ CREATE OR REPLACE PROCEDURE import(table_name varchar, path text, sep char DEFAU
     END;$$;
 
 --Procedure for export
-DROP PROCEDURE IF EXISTS export();
 CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAULT '\t')
     LANGUAGE plpgsql AS $$
     BEGIN
@@ -123,3 +121,14 @@ CALL import('SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/d
 CALL import('Checks', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Checks.tsv');
 CALL import('Date_Of_Analysis_Formation', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Date_Of_Analysis_Formation.tsv');
 CALL import('Stores', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Stores.tsv');
+
+--  Data export to specified path
+SET DATESTYLE to iso, DMY;
+CALL export('Personal_Data', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Personal_Data.csv', ',');
+CALL export('Cards', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Cards.csv', ',');
+CALL export('Transactions', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Transactions.csv', ',');
+CALL export('Groups_SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Groups_SKU.csv', ',');
+CALL export('SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/SKU.csv', ',');
+CALL export('Checks', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Checks.csv', ',');
+CALL export('Date_Of_Analysis_Formation', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Date_Of_Analysis_Formation.csv', ',');
+CALL export('Stores', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Stores.csv', ',');
