@@ -113,22 +113,24 @@ CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAU
 
 -- Data import from datasets
 SET DATESTYLE to iso, DMY;
-CALL import('Personal_Data', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Personal_Data.tsv');
-CALL import('Cards', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Cards.tsv');
-CALL import('Transactions', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Transactions.tsv');
-CALL import('Groups_SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Groups_SKU.tsv');
-CALL import('SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/SKU.tsv');
-CALL import('Checks', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Checks.tsv');
-CALL import('Date_Of_Analysis_Formation', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Date_Of_Analysis_Formation.tsv');
-CALL import('Stores', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/Stores.tsv');
+SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+CALL import('Personal_Data', (current_setting('imp_path.txt') || 'Personal_Data.tsv'));
+CALL import('Cards', (current_setting('imp_path.txt') || 'Cards.tsv'));
+CALL import('Transactions', (current_setting('imp_path.txt') || 'Transactions.tsv'));
+CALL import('Groups_SKU', (current_setting('imp_path.txt') || 'Groups_SKU.tsv'));
+CALL import('SKU', (current_setting('imp_path.txt') || 'SKU.tsv'));
+CALL import('Checks', (current_setting('imp_path.txt') || 'Checks.tsv'));
+CALL import('Date_Of_Analysis_Formation', (current_setting('imp_path.txt') || 'Date_Of_Analysis_Formation.tsv'));
+CALL import('Stores', (current_setting('imp_path.txt') || 'Stores.tsv'));
 
 --  Data export to specified path
 SET DATESTYLE to iso, DMY;
-CALL export('Personal_Data', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Personal_Data.csv', ',');
-CALL export('Cards', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Cards.csv', ',');
-CALL export('Transactions', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Transactions.csv', ',');
-CALL export('Groups_SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Groups_SKU.csv', ',');
-CALL export('SKU', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/SKU.csv', ',');
-CALL export('Checks', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Checks.csv', ',');
-CALL export('Date_Of_Analysis_Formation', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Date_Of_Analysis_Formation.csv', ',');
-CALL export('Stores', '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Stores.csv', ',');
+SET exp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
+CALL export('Personal_Data', (current_setting('exp_path.txt') || 'Personal_Data.csv'), ',');
+CALL export('Cards', (current_setting('exp_path.txt') || 'Cards.csv'), ',');
+CALL export('Transactions', (current_setting('exp_path.txt') || 'Transactions.csv'), ',');
+CALL export('Groups_SKU', (current_setting('exp_path.txt') || 'Groups_SKU.csv'), ',');
+CALL export('SKU', (current_setting('exp_path.txt') || 'SKU.csv'), ',');
+CALL export('Checks', (current_setting('exp_path.txt') || 'Checks.csv'), ',');
+CALL export('Date_Of_Analysis_Formation', (current_setting('exp_path.txt') || 'Date_Of_Analysis_Formation.csv'), ',');
+CALL export('Stores', (current_setting('exp_path.txt') || 'Stores.csv'), ',');
