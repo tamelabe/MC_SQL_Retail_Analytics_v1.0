@@ -11,6 +11,14 @@ CREATE TABLE Personal_Data (
   Customer_Primary_Phone VARCHAR(20) NOT NULL CHECK (Customer_Primary_Phone ~ '^((\+7)+([0-9]){10})$')
 );
 
+-- INSERT INTO Personal_Data(Customer_ID, Customer_Name, Customer_Surname,Customer_Primary_Email, Customer_Primary_Phone)
+-- VALUES (1, "ALINA", "S", "sultanova.6@mail.ru", "+71234567890");
+
+INSERT INTO Personal_Data(Customer_ID, Customer_Name, Customer_Surname, Customer_Primary_Email, Customer_Primary_Phone)
+VALUES (1, 'Alina', 'Su', 'agdf@t.ru', '+71234567890');
+SELECT * FROM Personal_Data ORDER BY 1;
+
+
 --#2 Cards Table
 DROP TABLE IF EXISTS Cards CASCADE;
 CREATE TABLE Cards (
@@ -19,6 +27,10 @@ CREATE TABLE Cards (
     FOREIGN KEY (Customer_ID) REFERENCES Personal_Data (Customer_ID)
 );
 COMMENT ON COLUMN Cards.Customer_ID IS 'One customer can own several cards';
+
+INSERT INTO Cards(Customer_Card_ID, Customer_ID)
+VALUES (1, 1);
+SELECT * FROM Cards ORDER BY 1;
 
 --#3 Transactions Table
 DROP TABLE IF EXISTS Transactions CASCADE;
@@ -113,7 +125,7 @@ CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAU
 
 -- Data import from datasets
 SET DATESTYLE to iso, DMY;
-SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+SET imp_path.txt TO '/Users/myrebean/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 CALL import('Personal_Data', (current_setting('imp_path.txt') || 'Personal_Data.tsv'));
 CALL import('Cards', (current_setting('imp_path.txt') || 'Cards.tsv'));
 CALL import('Transactions', (current_setting('imp_path.txt') || 'Transactions.tsv'));
@@ -125,7 +137,7 @@ CALL import('Stores', (current_setting('imp_path.txt') || 'Stores.tsv'));
 
 --  Data export to specified path
 SET DATESTYLE to iso, DMY;
-SET exp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
+SET exp_path.txt TO '/Users/myrebean/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
 CALL export('Personal_Data', (current_setting('exp_path.txt') || 'Personal_Data.csv'), ',');
 CALL export('Cards', (current_setting('exp_path.txt') || 'Cards.csv'), ',');
 CALL export('Transactions', (current_setting('exp_path.txt') || 'Transactions.csv'), ',');
