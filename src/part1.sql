@@ -28,9 +28,9 @@ CREATE TABLE Cards (
 );
 COMMENT ON COLUMN Cards.Customer_ID IS 'One customer can own several cards';
 
-INSERT INTO Cards(Customer_Card_ID, Customer_ID)
-VALUES (1, 1);
-SELECT * FROM Cards ORDER BY 1;
+-- INSERT INTO Cards(Customer_Card_ID, Customer_ID)
+-- VALUES (1, 1);
+-- SELECT * FROM Cards ORDER BY 1;
 
 --#3 Transactions Table
 DROP TABLE IF EXISTS Transactions CASCADE;
@@ -39,7 +39,7 @@ CREATE TABLE Transactions (
     Customer_Card_ID BIGINT NOT NULL,
     Transaction_Summ NUMERIC(10,2) NOT NULL,
     Transaction_DateTime TIMESTAMP(0)  WITHOUT TIME ZONE,
-    Transaction_Store_ID VARCHAR NOT NULL,
+    Transaction_Store_ID BIGINT NOT NULL,
     FOREIGN KEY (Customer_Card_ID) REFERENCES Cards (Customer_Card_ID)
 );
 COMMENT ON COLUMN Transactions.Transaction_ID IS 'Unique value';
