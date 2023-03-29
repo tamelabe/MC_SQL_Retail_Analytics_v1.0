@@ -84,7 +84,7 @@ FROM (SELECT "Customer_ID",
          JOIN cte3 ON cte3."Cust_ID" = biginfo."Customer_ID";
 
 -- Purchase history View
-CREATE MATERIALIZED VIEW IF NOT EXISTS Purchase_History_View AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS support AS
 SELECT CR.Customer_ID,
        TR.Transaction_ID,
        TR.Transaction_DateTime,
@@ -104,6 +104,17 @@ JOIN Checks AS CK ON TR.Transaction_ID = CK.Transaction_ID
 JOIN SKU AS SKU ON SKU.SKU_ID = CK.SKU_ID
 JOIN Stores AS SR ON SKU.SKU_ID = SR.SKU_ID
 AND TR.Transaction_Store_ID = SR.Transaction_Store_ID;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS Purchase_History_View AS
+SELECT Customer_ID,
+       Transaction_ID,
+       Transaction_DateTime,
+       Group_ID,
+       sum(SKU_Purchase_Price * SKU_Amount),
+       sum(SKU_Summ),
+       sum(SKU_Summ_Paid)
+FROM support
+GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
 
 -- Periods View
 CREATE MATERIALIZED VIEW IF NOT EXISTS Periods_View (
@@ -134,12 +145,4 @@ SELECT Customer_ID,
 
 -- Groups View
 CREATE MATERIALIZED VIEW IF NOT EXISTS Groups_View AS
-SELECT Customer_ID,
-       Transaction_ID,
-       Transaction_DateTime,
-       Group_ID,
-       SUM(SKU_Purchase_Price * SKU_Amount),
-       SUM(SKU_Summ),
-       SUM(SKU_Summ_Paid)
-FROM Purchase_History_View
-GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
+
