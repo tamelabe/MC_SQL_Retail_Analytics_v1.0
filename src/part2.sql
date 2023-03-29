@@ -8,31 +8,6 @@ CREATE TABLE Segments
 );
 
 -- Customers View
-
--- CREATE VIEW customers_view AS
--- SELECT c.Customer_ID as customer_id, sum(Transaction_Summ) / COUNT(Transaction_Summ) as customer_average_check,
--- FROM cards c
--- join transaction t on c.Customer_Card_ID
-
--- CREATE OR REPLACE VIEW customer_view (
---     Customer_ID,
---     Customer_Average_Check,
---     Customer_Average_Check_Segment,
---     Customer_Frequency,
---     Customer_Frequency_Segment,
---     Customer_Inactive_Period,
---     Customer_Churn_Rate,
---     Customer_Churn_Segment,
---     Customer_Segment,
---     Customer_Primary_Store
--- ) AS
-
--- WITH temp_table AS (SELECT *
---                     FROM cards
---                     JOIN transactions ON cards.Customer_Card_ID = transactions.Customer_Card_ID
---                     WHERE Transaction_DateTime < (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation)),
-
-
 CREATE MATERIALIZED VIEW IF NOT EXISTS Customer_View AS
 WITH maininfo AS (
     SELECT PD.Customer_ID AS "CI",
@@ -51,15 +26,11 @@ WITH maininfo AS (
 cte2 AS (
     SELECT DISTINCT "CI",
            first_value("TSI") OVER (PARTITION BY "CI" ORDER BY CNT DESC, "TD" DESC) AS SHOP,
-           first_value("TSI") OVER (PARTITION BY "CI" ORDER BY RN) AS LAST_SHOP
-    FROM maininfo
+           first_value("TSI") OVER (PARTITION BY "CI" ORDER BY RN) AS LAST_SHOP FROM maininfo
 ),
 cte3 AS (
-    SELECT "CI",
-           COUNT(DISTINCT "TSI") last_3_cnt
-    FROM maininfo
-    WHERE rn <= 3
-    GROUP BY "CI"
+    SELECT "CI", COUNT(DISTINCT "TSI") last_3_cnt
+    FROM maininfo WHERE RN <= 3 GROUP BY "CI"
 )
 
 SELECT "Customer_ID",
@@ -71,57 +42,44 @@ SELECT "Customer_ID",
        "Customer_Churn_Rate",
        "Customer_Churn_Segment",
        Segment AS "Segment",
-
        CASE
            WHEN last_3_cnt = 1 THEN LAST_SHOP
            ELSE SHOP
            END AS Customer_Primary_Store
-
 FROM (SELECT "Customer_ID",
              "Customer_Average_Check",
-
              CASE
                  WHEN (PERCENT_RANK() OVER w_ocac_d < 0.1) THEN 'High'
                  WHEN (PERCENT_RANK() OVER w_ocac_d < 0.25) THEN 'Medium'
                  ELSE 'Low'
                  END AS "Customer_Average_Check_Segment",
-
              "Customer_Frequency",
-
              CASE
                  WHEN (PERCENT_RANK() OVER w_ocf < 0.1) THEN 'Often'
                  WHEN (PERCENT_RANK() OVER w_ocf < 0.35) THEN 'Occasionally'
                  ELSE 'Rarely'
                  END AS "Customer_Frequency_Segment",
-
              "Customer_Inactive_Period",
-
-             "Customer_Inactive_Period" / "Customer_Frequency" AS "Customer_Churn_Rate",
-
+             ("Customer_Inactive_Period"/"Customer_Frequency") AS "Customer_Churn_Rate",
              CASE
-                 WHEN ("Customer_Inactive_Period" / "Customer_Frequency" < 2) THEN 'Low'
-                 WHEN ("Customer_Inactive_Period" / "Customer_Frequency" < 5) THEN 'Medium'
+                 WHEN ("Customer_Inactive_Period"/"Customer_Frequency" < 2) THEN 'Low'
+                 WHEN ("Customer_Inactive_Period"/"Customer_Frequency" < 5) THEN 'Medium'
                  ELSE 'High'
                  END AS "Customer_Churn_Segment"
 
       FROM (SELECT "CI" AS "Customer_ID",
                    "ATS" AS "Customer_Average_Check",
-
                    EXTRACT(EPOCH from MAX("TD") - MIN("TD"))::float / 86400.0 /
                    COUNT("CI") AS "Customer_Frequency",
-
-                   EXTRACT(EPOCH from (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) -
-                   MAX("TD")) / 86400.0 AS "Customer_Inactive_Period"
-            FROM maininfo
-            GROUP BY "CI", "ATS"
+                   EXTRACT(EPOCH from (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) - MAX("TD"))/86400.0 AS "Customer_Inactive_Period"
+            FROM maininfo GROUP BY "CI", "ATS"
                 WINDOW w_oats_d AS (ORDER BY sum("ATS") DESC)) AS avmain
       GROUP BY "Customer_ID",
                "Customer_Average_Check",
                "Customer_Frequency",
                "Customer_Inactive_Period"
-          WINDOW w_ocac_d AS (ORDER BY sum("Customer_Average_Check") DESC),
-              w_ocf AS (ORDER BY "Customer_Frequency")) AS biginfo
-         JOIN Segments AS S ON (S.Average_Check = "Customer_Average_Check_Segment" AND
+          WINDOW w_ocac_d AS (ORDER BY sum("Customer_Average_Check") DESC), w_ocf AS (ORDER BY "Customer_Frequency")) AS biginfo
+          JOIN Segments AS S ON (S.Average_Check = "Customer_Average_Check_Segment" AND
                                 S.Purchase_Frequency = "Customer_Frequency_Segment" AND
                                 S.Churn_Probability = "Customer_Churn_Segment")
          JOIN cte2 ON cte2."CI" = biginfo."Customer_ID"
@@ -149,15 +107,14 @@ JOIN Stores AS SR ON SKU.SKU_ID = SR.SKU_ID
 AND TR.Transaction_Store_ID = SR.Transaction_Store_ID;
 
 -- Groups View
-
 CREATE MATERIALIZED VIEW IF NOT EXISTS v_history AS
 SELECT Customer_ID AS "Customer_ID",
        Transaction_ID AS "Transaction_ID",
        Transaction_DateTime AS "Transaction_DateTime",
        Group_ID AS "Group_ID",
-       SUM(sku_purchase_price * sku_amount) AS "Group_Cost",
-       SUM(SKU_Sum) AS "Group_Summ",
-       SUM(sku_summ_paid) AS "Group_Summ_Paid"
+       SUM(SKU_Purchase_Price * SKU_Amount) AS "Group_Cost",
+       SUM(SKU_Summ) AS "Group_Summ",
+       SUM(SKU_Summ_Paid) AS "Group_Summ_Paid"
 FROM support
 GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
 
