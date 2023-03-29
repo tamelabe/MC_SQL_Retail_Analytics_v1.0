@@ -85,19 +85,20 @@ FROM (SELECT "Customer_ID",
          JOIN cte2 ON cte2."CI" = biginfo."Customer_ID"
          JOIN cte3 ON cte3."CI" = biginfo."Customer_ID";
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS support AS
-SELECT CR.Customer_ID,
-       TR.Transaction_ID,
-       TR.Transaction_DateTime,
-       TR.Transaction_Store_ID,
-       SKU.Group_ID,
-       CK.SKU_Amount,
-       SR.SKU_ID,
-       SR.SKU_Retail_Price,
-       SR.SKU_Purchase_Price,
-       CK.SKU_Summ_Paid,
-       CK.SKU_Summ,
-       CK.SKU_Discount
+-- Purchase history View
+CREATE MATERIALIZED VIEW IF NOT EXISTS Purchase_history_View AS
+SELECT CR.Customer_ID AS "Customer_ID",
+       TR.Transaction_ID AS "Transaction_ID",
+       TR.Transaction_DateTime AS "Transaction_DateTime",
+       TR.Transaction_Store_ID AS "Transaction_Store_ID",
+       SKU.Group_ID AS "Group_ID",
+       CK.SKU_Amount AS "SKU_Amount",
+       SR.SKU_ID AS "SKU_ID",
+       SR.SKU_Retail_Price AS "SKU_Retail_Price",
+       SR.SKU_Purchase_Price AS "SKU_Purchase_Price",
+       CK.SKU_Summ_Paid AS "SKU_Summ_Paid",
+       CK.SKU_Summ AS "SKU_Summ",
+       CK.SKU_Discount AS "SKU_Discount"
 FROM Transactions AS TR
 JOIN Cards AS CR ON CR.Customer_Card_ID = TR.Customer_Card_ID
 JOIN Personal_data AS PD ON PD.Customer_ID = CR.Customer_ID
@@ -105,6 +106,33 @@ JOIN Checks AS CK ON TR.Transaction_ID = CK.Transaction_ID
 JOIN SKU AS SKU ON SKU.SKU_ID = CK.SKU_ID
 JOIN Stores AS SR ON SKU.SKU_ID = SR.SKU_ID
 AND TR.Transaction_Store_ID = SR.Transaction_Store_ID;
+
+-- Periods View
+CREATE VIEW Periods_View (
+        Customer_ID AS "Customer_ID",
+        Group_ID AS "Group_ID",
+        First_Group_Purchase_Date AS "First_Group_Purchase_Date",
+        Last_Group_Purchase_Date AS "Last_Group_Purchase_Date",
+        Group_Purchase AS "Group_Purchase",
+        Group_Frequency AS "Group_Frequency",
+        Group_Min_Discount AS "Group_Min_Discount"
+        ) AS
+SELECT Customer_ID,
+       Group_ID,
+       MIN(Transaction_DateTime)::timestamp First_Date,
+       MAX(Transaction_DateTime)::timestamp Last_Date,
+       COUNT(*)                  Group_Purchase,
+       (((TO_CHAR((MAX(Transaction_DateTime)::timestamp - MIN(Transaction_DateTime)::timestamp), 'DD'))::int + 1)*1.0) / COUNT(*)*1.0 as Group_Frequency,
+       COALESCE((SELECT MIN(SKU_Discount / SKU_Summ) FROM Checks c1
+       JOIN purchase_history_view ph2 ON ph2.Transaction_ID = c1.Transaction_ID
+       WHERE (SKU_Discount / SKU_Summ) > 0 AND ph2.Customer_ID = t1.Customer_ID
+       AND ph2.Group_ID = t1.Group_ID), 0) AS Group_Minimum_Discount
+  FROM (SELECT DISTINCT Customer_ID, t.Transaction_DateTime, c.SKU_Discount, SKU.group_id, c.SKU_Summ
+          FROM Cards
+                JOIN transactions t ON cards.customer_card_id = t.customer_card_id
+                 JOIN checks c ON t.transaction_id = c.transaction_id
+                  JOIN SKU ON SKU.SKU_ID = c.sku_id) AS t1
+ GROUP BY Group_ID, customer_id;
 
 -- Groups View
 CREATE MATERIALIZED VIEW IF NOT EXISTS v_history AS
@@ -117,27 +145,3 @@ SELECT Customer_ID AS "Customer_ID",
        SUM(SKU_Summ_Paid) AS "Group_Summ_Paid"
 FROM support
 GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
-
--- Periods View
--- CREATE MATERIALIZED VIEW IF NOT EXISTS v_periods AS
--- SELECT Customer_ID                          AS "Customer_ID",
---        Group_Id                             AS "Group_ID",
---        min(transaction_datetime)            AS "First_Group_Purchase_Date",
---        max(transaction_datetime)            AS "Last_Group_Purchase_Date",
---        count(DISTINCT transaction_id)       AS "Group_Purchase",
---        (extract(EPOCH FROM max(transaction_datetime) - min(transaction_datetime))::float / 86400.0 + 1)
---            / count(DISTINCT transaction_id) AS "Group_Frequency",
---        min(sku_discount / sku_summ)         AS "Group_Min_Discount"
--- FROM customer_view
--- GROUP BY customer_id, group_id;
-
-
-
-
-
-
--- Purchase History View
-
-
-
-
