@@ -1,5 +1,5 @@
-DROP FUNCTION offersGrowthCheck(calc_method smallint, fst_n_lst_date_m1 varchar, transact_cnt_m2 bigint, k_check_incs float8, churn_idx float8, trans_share_max real, marge_share_avl real);
-CREATE OR REPLACE FUNCTION offersGrowthCheck
+DROP FUNCTION IF EXISTS offersGrowthCheck(smallint, varchar, bigint, float8, float8, real, real);
+CREATE FUNCTION offersGrowthCheck
     (calc_method smallint, fst_n_lst_date_m1 varchar DEFAULT '0',
     transact_cnt_m2 bigint DEFAULT 0, k_check_incs float8, churn_idx float8,
     trans_share_max real, marge_share_avl real)
@@ -23,10 +23,8 @@ CREATE OR REPLACE FUNCTION offersGrowthCheck
     END;
     $$;
 
-SELECT * FROM avgCheckM1('2018-12-12 2018-12-12');
-
-DROP FUNCTION avgcheckm1(character varying);
-CREATE OR REPLACE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
+DROP FUNCTION IF EXISTS avgCheckM1(character varying);
+CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
     RETURNS TABLE (Customer_ID bigint, Avg_check real)
     LANGUAGE plpgsql AS
     $$
@@ -55,7 +53,27 @@ CREATE OR REPLACE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
     END;
     $$;
 
-CREATE OR REPLACE FUNCTION getKeyDates(key integer)
+DROP FUNCTION IF EXISTS avgCheckM2(bigint);
+CREATE FUNCTION avgCheckM2 (transact_num bigint)
+    RETURNS TABLE (Customer_ID bigint, Avg_check real)
+    LANGUAGE plpgsql AS
+    $$
+    BEGIN
+        RETURN QUERY
+        WITH pre_query AS (
+            SELECT customer_card_id, transaction_summ
+            FROM transactions
+            ORDER BY transaction_datetime DESC LIMIT transact_num)
+        SELECT c.Customer_ID, avg(transaction_summ)::real AS Avg_check
+        FROM pre_query pq
+        JOIN cards c ON c.customer_card_id = pq.customer_card_id
+        GROUP BY c.Customer_ID
+        ORDER BY 1;
+    END;
+    $$;
+
+DROP FUNCTION IF EXISTS getKeyDates(integer);
+CREATE FUNCTION getKeyDates(key integer)
     RETURNS SETOF date
     LANGUAGE plpgsql AS
     $$
