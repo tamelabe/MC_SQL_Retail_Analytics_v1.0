@@ -23,6 +23,8 @@ CREATE FUNCTION offersGrowthCheck
     END;
     $$;
 
+
+-- Считаем средний чек по первому методу
 DROP FUNCTION IF EXISTS avgCheckM1(character varying);
 CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
     RETURNS TABLE (Customer_ID bigint, Avg_check real)
@@ -53,6 +55,7 @@ CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
     END;
     $$;
 
+-- Считаем средний чек по второму методу
 DROP FUNCTION IF EXISTS avgCheckM2(bigint);
 CREATE FUNCTION avgCheckM2 (transact_num bigint)
     RETURNS TABLE (Customer_ID bigint, Avg_check real)
@@ -72,6 +75,7 @@ CREATE FUNCTION avgCheckM2 (transact_num bigint)
     END;
     $$;
 
+-- Получаем даты первой или последней транз-ии в зав-ти от ключа (аргумента)
 DROP FUNCTION IF EXISTS getKeyDates(integer);
 CREATE FUNCTION getKeyDates(key integer)
     RETURNS SETOF date
