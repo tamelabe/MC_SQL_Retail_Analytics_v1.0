@@ -37,7 +37,7 @@ DROP TABLE IF EXISTS Transactions CASCADE;
 CREATE TABLE Transactions (
     Transaction_ID BIGINT PRIMARY KEY,
     Customer_Card_ID BIGINT NOT NULL,
-    Transaction_Summ NUMERIC(10,2) NOT NULL,
+    Transaction_Summ REAL NOT NULL,
     Transaction_DateTime TIMESTAMP(0)  WITHOUT TIME ZONE,
     Transaction_Store_ID BIGINT NOT NULL,
     FOREIGN KEY (Customer_Card_ID) REFERENCES Cards (Customer_Card_ID)
@@ -88,9 +88,9 @@ DROP TABLE IF EXISTS Stores CASCADE;
 CREATE TABLE Stores (
     Transaction_Store_ID BIGINT NOT NULL,
     SKU_ID BIGINT NOT NULL,
-    SKU_Purchase_Price NUMERIC NOT NULL,
+    SKU_Purchase_Price REAL NOT NULL,
     CONSTRAINT fk_sku_id FOREIGN KEY (SKU_ID) REFERENCES SKU (SKU_ID),
-    SKU_Retail_Price NUMERIC
+    SKU_Retail_Price REAL
 );
 COMMENT ON COLUMN Stores.SKU_Purchase_Price IS 'Purchasing price of products for this store';
 COMMENT ON COLUMN Stores.SKU_Retail_Price IS 'The sale price of the product excluding discounts for this store';
