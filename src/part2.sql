@@ -1,15 +1,15 @@
-CREATE TABLE IF NOT EXISTS Segments
-(
-    Segment            BIGINT PRIMARY KEY,
-    Average_Check      VARCHAR(255) NOT NULL,
-    Purchase_Frequency VARCHAR(255) NOT NULL,
-    Churn_Probability  VARCHAR(255) NOT NULL
-);
-
--- CALL import('Segments', '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/Segments.csv', ',');
-
-COPY Segments (Segment, Average_Check, Purchase_Frequency, Churn_Probability)
-    FROM '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/Segments.csv' DELIMITER ',' CSV HEADER;
+-- CREATE TABLE IF NOT EXISTS Segments
+-- (
+--     Segment            BIGINT PRIMARY KEY,
+--     Average_Check      VARCHAR(255) NOT NULL,
+--     Purchase_Frequency VARCHAR(255) NOT NULL,
+--     Churn_Probability  VARCHAR(255) NOT NULL
+-- );
+--
+-- -- CALL import('Segments', '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/Segments.csv', ',');
+--
+-- COPY Segments (Segment, Average_Check, Purchase_Frequency, Churn_Probability)
+--     FROM '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/Segments.csv' DELIMITER ',' CSV HEADER;
 
 -- Customers View
 
@@ -120,29 +120,22 @@ SELECT Customer_ID,
        Transaction_ID,
        Transaction_DateTime,
        Group_ID,
-       sum(SKU_Purchase_Price * SKU_Amount),
-       sum(SKU_Summ),
-       sum(SKU_Summ_Paid)
+       sum(SKU_Purchase_Price * SKU_Amount) AS "Cost",
+       sum(SKU_Summ) AS "Group_Summ",
+       sum(SKU_Summ_Paid) AS "Summ_Paid"
 FROM Purchase_History_View
 GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
 
 -- Periods View
-CREATE MATERIALIZED VIEW IF NOT EXISTS Periods_View (
-        Customer_ID,
-        Group_ID,
-        First_Group_Purchase_Date,
-        Last_Group_Purchase_Date,
-        Group_Purchase,
-        Group_Frequency,
-        Group_Min_Discount
-        ) AS
+DROP MATERIALIZED VIEW Periods_View;
+CREATE MATERIALIZED VIEW IF NOT EXISTS Periods_View AS
 SELECT Customer_ID,
        Group_ID,
-       MIN(Transaction_DateTime)::timestamp First_Date,
-       MAX(Transaction_DateTime)::timestamp Last_Date,
+       MIN(Transaction_DateTime) AS "First_Group_Purchase_Date",
+       MAX(Transaction_DateTime) AS "Last_Group_Purchase_Date",
        COUNT(*) Group_Purchase,
        (((TO_CHAR((MAX(Transaction_DateTime)::timestamp - MIN(Transaction_DateTime)::timestamp), 'DD'))::int + 1)*1.0) / COUNT(*)*1.0 AS Group_Frequency,
-       COALESCE((SELECT MIN(c1.SKU_Discount / c1.SKU_Summ) FROM Checks c1
+       COALESCE((SELECT MIN(c1.SKU_Discount / c1.SKU_Summ) AS Group_Min_Discount FROM Checks c1
        JOIN Purchase_History_View ph2 ON ph2.Transaction_ID = c1.Transaction_ID
        WHERE (c1.SKU_Discount / c1.SKU_Summ) > 0 AND ph2.Customer_ID = t1.Customer_ID
        AND ph2.Group_ID = t1.Group_ID), 0) AS Group_Minimum_Discount
@@ -154,22 +147,23 @@ SELECT Customer_ID,
  GROUP BY Group_ID, Customer_ID;
 
 -- -- Groups View
-CREATE MATERIALIZED VIEW IF NOT EXISTS v_more_info AS
-SELECT VH."Customer_ID"               AS "Customer_ID",
-       VH."Group_ID"                  AS "Group_ID",
-       VH."Transaction_ID"            AS "Transaction_ID",
-       VH."Transaction_DateTime"      AS "Transaction_DateTime",
-       VH."Group_Cost"                AS "Group_Cost",
-       VH."Group_Summ"                AS "Group_Summ",
-       VH."Group_Summ_Paid"           AS "Group_Summ_Paid",
-       VP."First_Group_Purchase_Date" AS "First_Group_Purchase_Date",
-       VP."Last_Group_Purchase_Date"  AS "Last_Group_Purchase_Date",
-       VP."Group_Purchase"            AS "Group_Purchase",
-       VP."Group_Frequency"           AS "Group_Frequency",
-       VP."Group_Min_Discount"        AS "Group_Min_Discount"
+DROP MATERIALIZED VIEW Groups_View;
+CREATE MATERIALIZED VIEW IF NOT EXISTS Groups_View AS
+SELECT supp.Customer_ID,
+       supp.Group_ID,
+       supp.Transaction_ID,
+       supp.Transaction_DateTime,
+       supp."Cost",
+       supp."Group_Summ",
+       supp."Summ_Paid",
+       VP."First_Group_Purchase_Date",
+       VP."Last_Group_Purchase_Date",
+       VP.Group_Purchase,
+       VP.Group_Frequency,
+       VP.group_minimum_discount
 FROM Periods_View AS VP
-         JOIN support AS VH ON VH."Customer_ID" = VP."Customer_ID" AND
-                                 VH."Group_ID" = VP."Group_ID";
+         JOIN support AS supp ON supp.Customer_ID = VP.Customer_ID AND
+                                 supp.Group_ID = VP.Group_ID;
 
 CREATE OR REPLACE FUNCTION fnc_create_v_group(IN int default 1, IN interval default '5000 days'::interval,
                                               IN int default 100)
@@ -189,75 +183,59 @@ AS
 $$
 BEGIN
     RETURN QUERY
-        SELECT "Customer_ID"                                      AS "Customer_ID",
-               "Group_ID"                                         AS "Group_ID",
-               "Group_Affinity_Index"                             AS "Group_Affinity_Index",
-               "Group_Churn_Rate"                                 AS "Group_Churn_Rate",
-               coalesce(avg("Group_Stability_Index"), 0)          AS "Group_Stability_Index",
-
-               coalesce(CASE
-                            WHEN ($1 = 1) THEN
-                                        sum("Group_Margin"::float)
-                                        FILTER (WHERE "Transaction_DateTime" BETWEEN (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) - $2 AND
-                                            (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) )
-                            WHEN ($1 = 2) THEN
-                                (SELECT sum(GM)::float
-                                 FROM (SELECT "Group_Summ_Paid" - "Group_Cost" as GM
-                                       FROM v_more_info
-                                       WHERE VMI."Customer_ID" = v_more_info."Customer_ID"
-                                         AND VMI."Group_ID" = v_more_info."Group_ID"
-                                       ORDER BY "Transaction_DateTime" DESC
-                                       LIMIT $3) as SGM)
-                            END, 0)                               AS "Group_Margin",
-
-               "Group_Discount_Share",
-
-               coalesce((SELECT min(sku_discount / sku_summ)
-                         FROM Purchase_History_View AS VB
-                         WHERE VB.customer_id = VMI."Customer_ID"
-                           AND VB.group_id = VMI."Group_ID"
-                           AND sku_discount / sku_summ > 0.0), 0) AS "Group_Minimum_Discount",
-
-               avg(VMI."Group_Summ_Paid") / avg(VMI."Group_Summ") AS "Group_Average_Discount"
-
-
-        from (SELECT "Customer_ID"                                          AS "Customer_ID",
-                     "Group_ID"                                             AS "Group_ID",
-
-                     "Group_Purchase"::float /
-                     (SELECT count("Transaction_ID")
-                      FROM v_more_info AS VMI
-                      WHERE VMI."Customer_ID" = v_more_info."Customer_ID"
-                        AND VMI."Transaction_DateTime"
-                          BETWEEN v_more_info."First_Group_Purchase_Date"
-                          AND v_more_info."Last_Group_Purchase_Date")       AS "Group_Affinity_Index",
-
+        SELECT Customer_ID,
+               Group_ID,
+               "Group_Affinity_Index",
+               "Group_Churn_Rate",
+coalesce(avg("Group_Stability_Index"), 0),
+coalesce(CASE
+            WHEN ($1 = 1) THEN
+            sum("Group_Margin"::float)
+            FILTER (WHERE Transaction_DateTime BETWEEN (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) - $2 AND
+            (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) )
+                WHEN ($1 = 2) THEN
+                     (SELECT sum(GM)::float
+                     FROM (SELECT "Summ_Paid" - "Cost" as GM FROM Groups_View
+                           WHERE VMI.Customer_ID = Groups_View.Customer_ID
+                           AND VMI.Group_ID = Groups_View.Group_ID
+                           ORDER BY Transaction_DateTime DESC LIMIT $3) as SGM)
+END, 0) AS "Group_Margin", "Group_Discount_Share",
+coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_View AS VB
+                         WHERE VB.customer_id = VMI.Customer_ID AND VB.group_id = VMI.Group_ID
+                         AND sku_discount / sku_summ > 0.0), 0) AS "Group_Minimum_Discount",
+                         avg(VMI."Summ_Paid") / avg(VMI."Group_Summ") AS "Group_Average_Discount"
+        FROM (SELECT Customer_ID,
+                     Group_ID,
+                     Group_Purchase::float /
+                     (SELECT count(Transaction_ID)
+                      FROM Groups_View AS VMI
+                      WHERE VMI.Customer_ID = Groups_View.Customer_ID
+                        AND VMI.Transaction_DateTime
+                          BETWEEN Groups_View."First_Group_Purchase_Date"
+                          AND Groups_View."Last_Group_Purchase_Date") AS "Group_Affinity_Index",
                      extract(EPOCH from (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) -
-                                        max("Transaction_DateTime")
-                                        OVER (PARTITION BY "Customer_ID", "Group_ID"))::float / 86400.0 /
-                     "Group_Frequency"                                      AS "Group_Churn_Rate",
+                                        max(Transaction_DateTime)
+                                        OVER (PARTITION BY Customer_ID, Group_ID))::float / 86400.0 /
+                     Group_Frequency                                      AS "Group_Churn_Rate",
 
-                     abs(extract(epoch from "Transaction_DateTime" - lag("Transaction_DateTime", 1)
-                                                                     over (partition by "Customer_ID", "Group_ID"
-                                                                         order by "Transaction_DateTime"))::float /
-                         86400.0 - "Group_Frequency") / "Group_Frequency"   as "Group_Stability_Index",
+                     abs(extract(epoch from Transaction_DateTime - lag(Transaction_DateTime, 1)
+                                                                     over (partition by Customer_ID, Group_ID
+                                                                         order by Transaction_DateTime))::float /
+                         86400.0 - Group_Frequency) / Group_Frequency   as "Group_Stability_Index",
 
-                     "Group_Summ_Paid" - "Group_Cost"                       AS "Group_Margin",
-                     "Transaction_DateTime",
+                     "Summ_Paid" - "Cost"                       AS "Group_Margin",
+                     Transaction_DateTime,
 
                      (SELECT count(transaction_id)
                       FROM Purchase_History_View AS VB
-                      WHERE v_more_info."Customer_ID" = VB.customer_id
-                        AND v_more_info."Group_ID" = VB.group_id
-                        AND VB.SKU_Discount != 0)::float / "Group_Purchase" AS "Group_Discount_Share",
-                     "Group_Summ_Paid",
+                      WHERE Groups_View.Customer_ID = VB.Customer_ID
+                        AND Groups_View.Group_ID = VB.Group_ID
+                        AND VB.SKU_Discount != 0)::float / Group_Purchase AS "Group_Discount_Share",
+                     "Summ_Paid",
                      "Group_Summ"
 
-              FROM v_more_info) as VMI
-        GROUP BY "Customer_ID", "Group_ID", "Group_Affinity_Index", "Group_Churn_Rate", "Group_Discount_Share";
+              FROM Groups_View) as VMI
+        GROUP BY VMI.Customer_ID, Group_ID, "Group_Affinity_Index", "Group_Churn_Rate", "Group_Discount_Share";
 END ;
 $$ LANGUAGE plpgsql;
 
-CREATE MATERIALIZED VIEW v_group AS
-select *
-from fnc_create_v_group();
