@@ -1,20 +1,25 @@
-DROP FUNCTION IF EXISTS offersGrowthCheck(smallint, varchar, bigint, float8, float8, real, real);
+SELECT * FROM offersGrowthCheck(2, '12-12-2018 11-11-2020', 4, 1.5, 1.5, 1.5, 1.5);
+
+DROP FUNCTION IF EXISTS offersGrowthCheck(integer, varchar, bigint, real, float8, real, real);
 CREATE FUNCTION offersGrowthCheck
-    (calc_method smallint, fst_n_lst_date_m1 varchar DEFAULT '0',
-    transact_cnt_m2 bigint DEFAULT 0, k_check_incs float8, churn_idx float8,
+    (calc_method integer, fst_n_lst_date_m1 varchar,
+    transact_cnt_m2 bigint, k_check_incs real, churn_idx float8,
     trans_share_max real, marge_share_avl real)
-    RETURNS table (Customer_ID bigint, Required_Check_Measure real,
-                    Group_Name varchar, Offer_Discount_Depth real)
+    RETURNS table (Customer_ID bigint, Required_Check_Measure real)
+--                     Group_Name varchar, Offer_Discount_Depth real)
     LANGUAGE plpgsql AS
     $$
     BEGIN
+--      Выбор метода расчета среднего чека
         IF (calc_method = 1) THEN
             RETURN QUERY (
-                SELECT * FROM cards
+                SELECT ch.Customer_ID, ch.Required_Check_Measure
+                FROM avgCheckM1(fst_n_lst_date_m1, k_check_incs) AS ch
             );
         ELSEIF (calc_method = 2) THEN
             RETURN QUERY (
-                SELECT * FROM cards
+                SELECT ch.Customer_ID, ch.Required_Check_Measure
+                FROM avgCheckM2(transact_cnt_m2, k_check_incs) AS ch
             );
         ELSE
             RAISE EXCEPTION
@@ -24,10 +29,10 @@ CREATE FUNCTION offersGrowthCheck
     $$;
 
 
--- Считаем средний чек по первому методу
-DROP FUNCTION IF EXISTS avgCheckM1(character varying);
-CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
-    RETURNS TABLE (Customer_ID bigint, Avg_check real)
+-- Считаем целевое значение среднего чека по первому методу
+DROP FUNCTION IF EXISTS avgCheckM1(character varying, real);
+CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar, k_check_incr real)
+    RETURNS TABLE (Customer_ID bigint, Required_Check_Measure real)
     LANGUAGE plpgsql AS
     $$
     DECLARE
@@ -44,21 +49,21 @@ CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar)
         END IF;
         RETURN QUERY
             WITH pre_query AS (
-                SELECT cards.customer_id AS Customer_ID, t.transaction_summ AS trans_summ
+                SELECT cards.customer_id AS Customer_ID, (t.transaction_summ) AS trans_summ
                 FROM cards
                 JOIN transactions t on cards.customer_card_id = t.customer_card_id
                 WHERE t.transaction_datetime BETWEEN lower_date and upper_date)
-            SELECT pq.Customer_ID, avg(trans_summ)::real AS Avg_check
+            SELECT pq.Customer_ID, avg(trans_summ)::real * k_check_incr AS Avg_check
             FROM pre_query pq
             GROUP BY pq.Customer_ID
             ORDER BY 1;
     END;
     $$;
 
--- Считаем средний чек по второму методу
+-- Считаем целевое значение среднего чека по второму методу
 DROP FUNCTION IF EXISTS avgCheckM2(bigint);
-CREATE FUNCTION avgCheckM2 (transact_num bigint)
-    RETURNS TABLE (Customer_ID bigint, Avg_check real)
+CREATE FUNCTION avgCheckM2 (transact_num bigint, k_check_incr real)
+    RETURNS TABLE (Customer_ID bigint, Required_Check_Measure real)
     LANGUAGE plpgsql AS
     $$
     BEGIN
@@ -67,7 +72,7 @@ CREATE FUNCTION avgCheckM2 (transact_num bigint)
             SELECT customer_card_id, transaction_summ
             FROM transactions
             ORDER BY transaction_datetime DESC LIMIT transact_num)
-        SELECT c.Customer_ID, avg(transaction_summ)::real AS Avg_check
+        SELECT c.Customer_ID, avg(transaction_summ)::real * k_check_incr AS Avg_check
         FROM pre_query pq
         JOIN cards c ON c.customer_card_id = pq.customer_card_id
         GROUP BY c.Customer_ID
@@ -95,3 +100,6 @@ CREATE FUNCTION getKeyDates(key integer)
         END IF;
     END;
     $$;
+
+
+
