@@ -29,6 +29,7 @@ CREATE FUNCTION offersGrowthCheck
     $$;
 
 
+
 -- Считаем целевое значение среднего чека по первому методу
 DROP FUNCTION IF EXISTS avgCheckM1(character varying, real);
 CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar, k_check_incr real)

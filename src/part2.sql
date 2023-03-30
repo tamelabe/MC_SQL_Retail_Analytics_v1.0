@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS Segments
 );
 
 -- Customers View
+DROP MATERIALIZED VIEW IF EXISTS Customer_View;
 CREATE MATERIALIZED VIEW IF NOT EXISTS Customer_View AS
 WITH maininfo AS (
     SELECT PD.Customer_ID AS "Cust_ID",
@@ -110,9 +111,9 @@ SELECT Customer_ID,
        Transaction_ID,
        Transaction_DateTime,
        Group_ID,
-       sum(SKU_Purchase_Price * SKU_Amount),
-       sum(SKU_Summ),
-       sum(SKU_Summ_Paid)
+       sum(SKU_Purchase_Price * SKU_Amount) AS Group_Cost,
+       sum(SKU_Summ) AS Group_Summ,
+       sum(SKU_Summ_Paid) AS Group_Summ_Paid
 FROM support
 GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
 
@@ -145,4 +146,3 @@ SELECT Customer_ID,
 
 -- Groups View
 CREATE MATERIALIZED VIEW IF NOT EXISTS Groups_View AS
-

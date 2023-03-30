@@ -14,9 +14,9 @@ CREATE TABLE Personal_Data (
 -- INSERT INTO Personal_Data(Customer_ID, Customer_Name, Customer_Surname,Customer_Primary_Email, Customer_Primary_Phone)
 -- VALUES (1, "ALINA", "S", "sultanova.6@mail.ru", "+71234567890");
 
-INSERT INTO Personal_Data(Customer_ID, Customer_Name, Customer_Surname, Customer_Primary_Email, Customer_Primary_Phone)
-VALUES (1, 'Alina', 'Su', 'agdf@t.ru', '+71234567890');
-SELECT * FROM Personal_Data ORDER BY 1;
+-- INSERT INTO Personal_Data(Customer_ID, Customer_Name, Customer_Surname, Customer_Primary_Email, Customer_Primary_Phone)
+-- VALUES (1, 'Alina', 'Su', 'agdf@t.ru', '+71234567890');
+-- SELECT * FROM Personal_Data ORDER BY 1;
 
 
 --#2 Cards Table
@@ -125,7 +125,7 @@ CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAU
 
 -- Data import from datasets
 SET DATESTYLE to iso, DMY;
-SET imp_path.txt TO '/Users/myrebean/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 CALL import('Personal_Data', (current_setting('imp_path.txt') || 'Personal_Data.tsv'));
 CALL import('Cards', (current_setting('imp_path.txt') || 'Cards.tsv'));
 CALL import('Transactions', (current_setting('imp_path.txt') || 'Transactions.tsv'));
