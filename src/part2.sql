@@ -239,3 +239,6 @@ coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_View AS VB
 END ;
 $$ LANGUAGE plpgsql;
 
+CREATE MATERIALIZED VIEW v_group AS
+select *
+from fnc_create_v_group();
