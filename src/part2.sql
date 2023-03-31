@@ -161,6 +161,7 @@ FROM Periods_View AS VP
          JOIN support AS supp ON supp.Customer_ID = VP.Customer_ID AND
                                  supp.Group_ID = VP.Group_ID;
 
+DROP FUNCTION IF EXISTS fnc_create_v_group(integer,interval,integer);
 CREATE OR REPLACE FUNCTION fnc_create_v_group(IN int default 1, IN interval default '5000 days'::interval,
                                               IN int default 100)
     RETURNS TABLE
@@ -173,17 +174,19 @@ CREATE OR REPLACE FUNCTION fnc_create_v_group(IN int default 1, IN interval defa
                 Group_Margin           float,
                 Group_Discount_Share   float,
                 Group_Minimum_Discount numeric,
-                Group_Average_Discount numeric
+                Group_Average_Discount float
             )
 AS
 $$
 BEGIN
     RETURN QUERY
-        SELECT Customer_ID,
-               Group_ID,
+        SELECT VMI.Customer_ID,
+               VMI.Group_ID,
                "Group_Affinity_Index",
                "Group_Churn_Rate",
+
 coalesce(avg("Group_Stability_Index"), 0),
+
 coalesce(CASE
             WHEN ($1 = 1) THEN
             sum("Group_Margin"::float)
@@ -196,42 +199,44 @@ coalesce(CASE
                            AND VMI.Group_ID = Groups_View.Group_ID
                            ORDER BY Transaction_DateTime DESC LIMIT $3) as SGM)
 END, 0) AS "Group_Margin", "Group_Discount_Share",
+
 coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_View AS VB
                          WHERE VB.customer_id = VMI.Customer_ID AND VB.group_id = VMI.Group_ID
-                         AND sku_discount / sku_summ > 0.0), 0) AS "Group_Minimum_Discount",
-                         avg(VMI."Summ_Paid") / avg(VMI."Group_Summ") AS "Group_Average_Discount"
-        FROM (SELECT Customer_ID,
-                     Group_ID,
-                     Group_Purchase::float /
+                         AND sku_discount / sku_summ > 0.0), 0)::numeric AS "Group_Minimum_Discount",
+                         avg(VMI."Group_Minimum_Discount") / avg(VMI."Group_Average_Discount")::float AS "Group_Average_Discount"
+        FROM (SELECT Groups_View.Customer_ID,
+                     Groups_View.Group_ID,
+                     Groups_View.Group_Purchase::float /
                      (SELECT count(Transaction_ID)
-                      FROM Groups_View AS VMI
-                      WHERE VMI.Customer_ID = Groups_View.Customer_ID
-                        AND VMI.Transaction_DateTime
+                      FROM Groups_View AS GP
+                      WHERE GP.Customer_ID = Groups_View.Customer_ID
+                        AND GP.Transaction_DateTime
                           BETWEEN Groups_View."First_Group_Purchase_Date"
                           AND Groups_View."Last_Group_Purchase_Date") AS "Group_Affinity_Index",
+
                      extract(EPOCH from (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) -
                                         max(Transaction_DateTime)
-                                        OVER (PARTITION BY Groups_View.Customer_ID, Group_ID))::float / 86400.0 /
+                                        OVER (PARTITION BY Groups_View.Customer_ID, Groups_View.Group_ID))::float / 86400.0 /
                      Group_Frequency                                      AS "Group_Churn_Rate",
 
                      abs(extract(epoch from Transaction_DateTime - lag(Transaction_DateTime, 1)
-                                                                     over (partition by Groups_View.Customer_ID, Group_ID
+                                                                     over (partition by Groups_View.Customer_ID, Groups_View.Group_ID
                                                                          order by Transaction_DateTime))::float /
                          86400.0 - Group_Frequency) / Group_Frequency   as "Group_Stability_Index",
 
                      "Summ_Paid" - "Cost"                       AS "Group_Margin",
-                     Transaction_DateTime,
+                     Transaction_DateTime, -- вот это выводит, но убирать нельзя
 
                      (SELECT count(transaction_id)
                       FROM Purchase_History_View AS VB
                       WHERE Groups_View.Customer_ID = VB.Customer_ID
                         AND Groups_View.Group_ID = VB.Group_ID
                         AND VB.SKU_Discount != 0)::float / Group_Purchase AS "Group_Discount_Share",
-                     "Summ_Paid",
-                     "Group_Summ"
+                     "Summ_Paid" as "Group_Minimum_Discount",
+                     "Group_Summ" as "Group_Average_Discount"
 
               FROM Groups_View) as VMI
-        GROUP BY VMI.Customer_ID, Group_ID, "Group_Affinity_Index", "Group_Churn_Rate", "Group_Discount_Share";
+        GROUP BY VMI.Customer_ID, VMI.Group_ID, "Group_Affinity_Index", "Group_Churn_Rate", "Group_Discount_Share";
 END ;
 $$ LANGUAGE plpgsql;
 
