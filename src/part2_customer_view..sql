@@ -1,30 +1,30 @@
--- Создание таблицы segments
-DROP TABLE IF EXISTS segments CASCADE;
-
-CREATE TABLE segments (
-    Segment integer PRIMARY KEY NOT NULL,
-    Average_check varchar NOT NULL,
-    Frequency_of_purchases varchar NOT NULL,
-    Churn_probability varchar NOT NULL
-);
-
-SET DATESTYLE to iso, DMY;
-SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
-CALL import('segments', (current_setting('imp_path.txt') || 'Segments.tsv'));
-
-
-DROP VIEW IF EXISTS Customers_View CASCADE;
-CREATE OR REPLACE VIEW Customers_View (
-    Customer_ID,
-    Customer_Average_Check,
-    Customer_Average_Check_Segment,
-    Customer_Frequency,
-    Customer_Frequency_Segment,
-    Customer_Inactive_Period,
-    Customer_Churn_Rate,
-    Customer_Churn_Segment,
-    Customer_Segment,
-    Customer_Primary_Store) AS
+-- -- Создание таблицы segments
+-- DROP TABLE IF EXISTS segments CASCADE;
+--
+-- CREATE TABLE segments (
+--     Segment integer PRIMARY KEY NOT NULL,
+--     Average_check varchar NOT NULL,
+--     Frequency_of_purchases varchar NOT NULL,
+--     Churn_probability varchar NOT NULL
+-- );
+--
+-- SET DATESTYLE to iso, DMY;
+-- SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+-- CALL import('segments', (current_setting('imp_path.txt') || 'Segments.tsv'));
+--
+--
+-- DROP VIEW IF EXISTS Customers_View CASCADE;
+-- CREATE OR REPLACE VIEW Customers_View (
+--     Customer_ID,
+--     Customer_Average_Check,
+--     Customer_Average_Check_Segment,
+--     Customer_Frequency,
+--     Customer_Frequency_Segment,
+--     Customer_Inactive_Period,
+--     Customer_Churn_Rate,
+--     Customer_Churn_Segment,
+--     Customer_Segment,
+--     Customer_Primary_Store) AS
 
     WITH
     transactions_plus AS (
@@ -87,7 +87,7 @@ CREATE OR REPLACE VIEW Customers_View (
                     extract(hour from (gd.difference)) / 24) +
                     extract(minute from (gd.difference)) / 1440)::real AS difference_c
                 FROM get_diffrence gd)
-        SELECT fs.row, fs.customer_id, fs.Customer_Average_Check, fs.Customer_Average_Check_Segment, fs.Customer_Frequency,
+        SELECT fs.customer_id, fs.Customer_Average_Check, fs.Customer_Average_Check_Segment, fs.Customer_Frequency,
              fs.Customer_Frequency_Segment, df.difference_c AS Customer_Inactive_Period
         FROM cus_freq_seg fs
         JOIN convert_to_days df ON df.customer_id = fs.customer_id
@@ -96,10 +96,80 @@ CREATE OR REPLACE VIEW Customers_View (
         SELECT *, (cp.Customer_Inactive_Period / cp.Customer_Frequency)::real AS Customer_Churn_Rate
         FROM cus_inact_per cp
     ),
+    cus_churn_rate_seg AS (
+        SELECT *,
+            (CASE
+                WHEN Customer_Churn_Rate < 2 THEN 'Low'
+                WHEN Customer_Churn_Rate >= 2 AND
+                     Customer_Churn_Rate < 5 THEN 'Medium'
+                ELSE 'High' END) AS Customer_Churn_Segment
+        FROM cus_churn_rate),
+    cus_seg AS (
+        SELECT crs.customer_id, crs.Customer_Average_Check, crs.Customer_Average_Check_Segment,
+               crs.Customer_Frequency, crs.Customer_Frequency_Segment, crs.Customer_Inactive_Period,
+               crs.Customer_Churn_Rate, crs.Customer_Churn_Segment, s.Segment AS Customer_Segment
+        FROM cus_churn_rate_seg crs
+        JOIN segments s ON  s.average_check = crs.Customer_Average_Check_Segment AND
+                            s.frequency_of_purchases = crs.Customer_Frequency_Segment AND
+                            s.churn_probability = crs.Customer_Churn_Segment),
+    cus_p_store AS (
+        WITH stores_trans_total AS (
+            SELECT customer_id, count(transaction_id) AS total_trans
+            FROM transactions_plus
+            GROUP BY 1),
+        stores_trans_cnt AS (
+            SELECT tp.customer_id, tp.transaction_store_id, count(transaction_store_id) AS trans_cnt, max(transaction_datetime) AS last_date
+            FROM transactions_plus tp
+            GROUP BY 1, 2),
+        stores_trans_share AS (
+            SELECT stc.customer_id, stc.transaction_store_id, stc.trans_cnt, (stc.trans_cnt::real / stt.total_trans)::real AS trans_share, stc.last_date
+            FROM stores_trans_cnt stc
+            JOIN stores_trans_total stt ON stt.customer_id = stc.customer_id
+            ORDER BY 1, 3 DESC),
+        req2_customers AS (
+            SELECT customer_id
+            FROM stores_trans_share
+            GROUP BY customer_id
+            HAVING count(distinct trans_share) = 3),
+        req3_customers AS (
+            SELECT customer_id, max(trans_share), max(last_date) AS latedt_date
+            FROM stores_trans_share
+            GROUP BY customer_id
+            HAVING count(distinct trans_share) < 3),
+
+
+        stores_trans_share_rank AS (
+            SELECT *, rank() OVER (PARTITION BY stc.customer_id ORDER BY stc.trans_share DESC, stc.trans_share) AS ts_rank
+            FROM stores_trans_share stc),
+
+
+        trans_num AS (
+            SELECT t1.customer_id, t1.transaction_store_id, t1.transaction_datetime, t1.row
+            FROM (SELECT *, row_number() over (partition by customer_id ORDER BY transaction_datetime DESC) row FROM transactions_plus t1) t1
+            ORDER BY 1, transaction_datetime DESC),
+        last_stores_trans AS (
+            SELECT tn.customer_id, tn.transaction_store_id, tn.transaction_datetime
+            FROM trans_num tn
+            WHERE tn.row <= 3
+            ORDER BY 1),
+        last_store_trans AS (
+            SELECT tn.customer_id, tn.transaction_store_id, tn.transaction_datetime
+            FROM trans_num tn
+            WHERE tn.row <= 1
+            ORDER BY 1),
+        req1_customers AS (
+            SELECT customer_id
+            FROM last_stores_trans
+            GROUP BY customer_id
+            HAVING count(distinct transaction_store_id) = 1)
+
+
+        SELECT * FROM  req1_customers)
+
 
         SELECT *
-        FROM cus_churn_rate
-        ORDER BY 2;
+        FROM cus_p_store;
+        ORDER BY 1;
 
 
 
