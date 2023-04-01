@@ -1,6 +1,5 @@
 -- Создание таблицы segments
 DROP TABLE IF EXISTS segments CASCADE;
-
 CREATE TABLE segments (
     Segment integer PRIMARY KEY NOT NULL,
     Average_check varchar NOT NULL,
@@ -8,13 +7,14 @@ CREATE TABLE segments (
     Churn_probability varchar NOT NULL
 );
 
+-- Импорт данных в таблицу segments
 SET DATESTYLE to iso, DMY;
 SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 CALL import('segments', (current_setting('imp_path.txt') || 'Segments.tsv'));
 
-
+-- Создание Сustomers_View
 DROP VIEW IF EXISTS Customers_View CASCADE;
-CREATE OR REPLACE VIEW Customers_View (
+CREATE VIEW Customers_View (
     Customer_ID,
     Customer_Average_Check,
     Customer_Average_Check_Segment,
