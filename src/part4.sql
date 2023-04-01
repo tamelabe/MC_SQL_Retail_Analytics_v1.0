@@ -3,7 +3,7 @@ SELECT * FROM offersGrowthCheck(2, '12-12-2018 11-11-2020', 4, 1.5, 1.5, 1.5, 1.
 DROP FUNCTION IF EXISTS offersGrowthCheck(integer, varchar, bigint, real, float8, real, real);
 CREATE FUNCTION offersGrowthCheck
     (calc_method integer, fst_n_lst_date_m1 varchar,
-    transact_cnt_m2 bigint, k_check_incs real, churn_idx float8,
+    transact_cnt_m2 bigint, k_check_incs real, churn_idx real,
     trans_share_max real, marge_share_avl real)
     RETURNS table (Customer_ID bigint, Required_Check_Measure real)
 --                     Group_Name varchar, Offer_Discount_Depth real)
@@ -27,8 +27,6 @@ CREATE FUNCTION offersGrowthCheck
         END IF;
     END;
     $$;
-
-
 
 -- Считаем целевое значение среднего чека по первому методу
 DROP FUNCTION IF EXISTS avgCheckM1(character varying, real);
@@ -101,6 +99,20 @@ CREATE FUNCTION getKeyDates(key integer)
         END IF;
     END;
     $$;
+
+CREATE FUNCTION rewardGroupDetermination (churn_idx real, trans_share_max real, marge_share_avl real)
+RETURNS TABLE
+LANGUAGE plpgsql AS
+    $$
+    BEGIN
+        WITH t1 AS
+            (SELECT * FROM groups_view gv
+            WHERE gv.group_churn_rate <= churn_idx AND gv.group_discount_share < trans_share_max)
+        SELECT *
+        FROM t1 WHERE  t1.group_affinity_index <= churn_idx OB;
+    END;
+    $$;
+
 
 
 
