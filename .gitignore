@@ -40,7 +40,7 @@
 *.su
 *.idb
 *.pdb
-*.DStore
+.DS_Store
 
 # Kernel Module Compile Results
 *.mod*
