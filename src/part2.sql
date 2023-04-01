@@ -26,8 +26,7 @@ CREATE VIEW Customers_View (
     Customer_Segment,
     Customer_Primary_Store) AS
 
-    WITH
-    transactions_plus AS (
+    WITH transactions_plus AS (
         SELECT c.customer_id, c.customer_card_id, t.transaction_id ,t.transaction_summ,
                t.transaction_datetime, t.transaction_store_id
         FROM transactions t
