@@ -40,6 +40,7 @@
 *.su
 *.idb
 *.pdb
+*.DStore
 
 # Kernel Module Compile Results
 *.mod*
@@ -49,3 +50,4 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+.idea/
