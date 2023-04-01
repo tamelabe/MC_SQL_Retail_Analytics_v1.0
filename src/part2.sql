@@ -1,3 +1,4 @@
+SET enable_seqscan = OFF;
 --Customers view
 DROP TABLE IF EXISTS segments CASCADE;
 CREATE TABLE segments (
@@ -162,14 +163,13 @@ CREATE VIEW Customers_View (
     SELECT cs.*, ut.Customer_Primary_Store
     FROM cus_seg cs
     JOIN union_tables ut ON ut.customer_id = cs.customer_id)
-
         SELECT *
         FROM cus_p_store
         ORDER BY 1;
 
-
 -- -- Purchase history View
-CREATE MATERIALIZED VIEW IF NOT EXISTS Purchase_History_View AS
+DROP VIEW IF EXISTS Purchase_History_View CASCADE;
+CREATE VIEW Purchase_History_View AS
 SELECT CR.Customer_ID,
        TR.Transaction_ID,
        TR.Transaction_DateTime,
@@ -190,7 +190,8 @@ JOIN SKU AS SKU ON SKU.SKU_ID = CK.SKU_ID
 JOIN Stores AS SR ON SKU.SKU_ID = SR.SKU_ID
 AND TR.Transaction_Store_ID = SR.Transaction_Store_ID;
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS support AS
+DROP VIEW IF EXISTS support CASCADE;
+CREATE VIEW support AS
 SELECT Customer_ID,
        Transaction_ID,
        Transaction_DateTime,
@@ -202,8 +203,8 @@ FROM Purchase_History_View
 GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
 
 -- Periods View
--- DROP MATERIALIZED VIEW Periods_View;
-CREATE MATERIALIZED VIEW IF NOT EXISTS Periods_View AS
+DROP VIEW IF EXISTS Periods_View CASCADE;
+CREATE VIEW Periods_View AS
 SELECT Customer_ID,
        Group_ID,
        MIN(Transaction_DateTime) AS "First_Group_Purchase_Date",
@@ -222,8 +223,8 @@ SELECT Customer_ID,
  GROUP BY Group_ID, Customer_ID;
 
 -- -- Groups View
-DROP MATERIALIZED VIEW Groups_View;
-CREATE MATERIALIZED VIEW IF NOT EXISTS Groups_View AS
+DROP VIEW IF EXISTS Groups_View CASCADE;
+CREATE VIEW Groups_View AS
 SELECT supp.Customer_ID,
        supp.Group_ID,
        supp.Transaction_ID,
@@ -240,8 +241,8 @@ FROM Periods_View AS VP
          JOIN support AS supp ON supp.Customer_ID = VP.Customer_ID AND
                                  supp.Group_ID = VP.Group_ID;
 
-DROP FUNCTION IF EXISTS fnc_create_v_group(integer,interval,integer);
-CREATE OR REPLACE FUNCTION fnc_create_v_group(IN int default 1, IN interval default '5000 days'::interval,
+DROP FUNCTION IF EXISTS fnc_create_v_group(integer,interval,integer) CASCADE;
+CREATE FUNCTION fnc_create_v_group(IN int default 1, IN interval default '5000 days'::interval,
                                               IN int default 100)
     RETURNS TABLE
             (
@@ -319,6 +320,7 @@ coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_View AS VB
 END ;
 $$ LANGUAGE plpgsql;
 
-CREATE MATERIALIZED VIEW v_group AS
+DROP VIEW IF EXISTS v_group CASCADE;
+CREATE VIEW v_group AS
 select *
 from fnc_create_v_group();
