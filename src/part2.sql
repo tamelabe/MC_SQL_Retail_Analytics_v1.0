@@ -168,8 +168,8 @@ CREATE VIEW Customers_View (
         ORDER BY 1;
 
 -- -- Purchase history View
-DROP VIEW IF EXISTS Purchase_History_View CASCADE;
-CREATE VIEW Purchase_History_View AS
+DROP VIEW IF EXISTS Purchase_History_Support CASCADE;
+CREATE VIEW Purchase_History_Support AS
 SELECT CR.Customer_ID,
        TR.Transaction_ID,
        TR.Transaction_DateTime,
@@ -190,16 +190,16 @@ JOIN SKU AS SKU ON SKU.SKU_ID = CK.SKU_ID
 JOIN Stores AS SR ON SKU.SKU_ID = SR.SKU_ID
 AND TR.Transaction_Store_ID = SR.Transaction_Store_ID;
 
-DROP VIEW IF EXISTS support CASCADE;
-CREATE VIEW support AS
+DROP VIEW IF EXISTS Purchase_History_View CASCADE;
+CREATE VIEW Purchase_History_View AS
 SELECT Customer_ID,
        Transaction_ID,
        Transaction_DateTime,
        Group_ID,
-       sum(SKU_Purchase_Price * SKU_Amount) AS "Cost",
+       sum(SKU_Purchase_Price * SKU_Amount) AS "Group_Cost",
        sum(SKU_Summ) AS "Group_Summ",
        sum(SKU_Summ_Paid) AS "Summ_Paid"
-FROM Purchase_History_View
+FROM Purchase_History_Support
 GROUP BY Customer_ID, Transaction_ID, Transaction_DateTime, Group_ID;
 
 -- Periods View
@@ -212,7 +212,7 @@ SELECT Customer_ID,
        COUNT(*) Group_Purchase,
        (((TO_CHAR((MAX(Transaction_DateTime)::timestamp - MIN(Transaction_DateTime)::timestamp), 'DD'))::int + 1)*1.0) / COUNT(*)*1.0 AS Group_Frequency,
        COALESCE((SELECT MIN(c1.SKU_Discount / c1.SKU_Summ) AS Group_Min_Discount FROM Checks c1
-       JOIN Purchase_History_View ph2 ON ph2.Transaction_ID = c1.Transaction_ID
+       JOIN Purchase_History_Support ph2 ON ph2.Transaction_ID = c1.Transaction_ID
        WHERE (c1.SKU_Discount / c1.SKU_Summ) > 0 AND ph2.Customer_ID = t1.Customer_ID
        AND ph2.Group_ID = t1.Group_ID), 0) AS Group_Minimum_Discount
   FROM (SELECT DISTINCT Customer_ID, t.Transaction_DateTime, c.SKU_Discount, SKU.Group_ID, c.SKU_Summ
@@ -229,7 +229,7 @@ SELECT supp.Customer_ID,
        supp.Group_ID,
        supp.Transaction_ID,
        supp.Transaction_DateTime,
-       supp."Cost",
+       supp."Group_Cost",
        supp."Group_Summ",
        supp."Summ_Paid",
        VP."First_Group_Purchase_Date",
@@ -238,7 +238,7 @@ SELECT supp.Customer_ID,
        VP.Group_Frequency,
        VP.group_minimum_discount
 FROM Periods_View AS VP
-         JOIN support AS supp ON supp.Customer_ID = VP.Customer_ID AND
+         JOIN Purchase_History_View AS supp ON supp.Customer_ID = VP.Customer_ID AND
                                  supp.Group_ID = VP.Group_ID;
 
 DROP FUNCTION IF EXISTS fnc_create_Groups_View(integer,interval,integer) CASCADE;
@@ -274,13 +274,13 @@ coalesce(CASE
             (SELECT Analysis_Formation FROM Date_Of_Analysis_Formation) )
                 WHEN ($1 = 2) THEN
                      (SELECT sum(GM)::float
-                     FROM (SELECT "Summ_Paid" - "Cost" as GM FROM Groups_View_Support
+                     FROM (SELECT "Summ_Paid" - "Group_Cost" as GM FROM Groups_View_Support
                            WHERE VMI.Customer_ID = Groups_View_Support.Customer_ID
                            AND VMI.Group_ID = Groups_View_Support.Group_ID
                            ORDER BY Transaction_DateTime DESC LIMIT $3) as SGM)
 END, 0) AS "Group_Margin", "Group_Discount_Share",
 
-coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_View AS VB
+coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_Support AS VB
                          WHERE VB.customer_id = VMI.Customer_ID AND VB.group_id = VMI.Group_ID
                          AND sku_discount / sku_summ > 0.0), 0)::numeric AS "Group_Minimum_Discount",
                          avg(VMI."Group_Minimum_Discount") / avg(VMI."Group_Average_Discount")::float AS "Group_Average_Discount"
@@ -304,11 +304,11 @@ coalesce((SELECT min(SKU_Discount / SKU_Summ) FROM Purchase_History_View AS VB
                                                                          order by Transaction_DateTime))::float /
                          86400.0 - Group_Frequency) / Group_Frequency   as "Group_Stability_Index",
 
-                     "Summ_Paid" - "Cost"                       AS "Group_Margin",
+                     "Summ_Paid" - "Group_Cost"                       AS "Group_Margin",
                      Transaction_DateTime, -- вот это выводит, но убирать нельзя
 
                      (SELECT count(transaction_id)
-                      FROM Purchase_History_View AS VB
+                      FROM Purchase_History_Support AS VB
                       WHERE Groups_View_Support.Customer_ID = VB.Customer_ID
                         AND Groups_View_Support.Group_ID = VB.Group_ID
                         AND VB.SKU_Discount != 0)::float / Group_Purchase AS "Group_Discount_Share",
@@ -324,3 +324,4 @@ DROP VIEW IF EXISTS Groups_View CASCADE;
 CREATE VIEW Groups_View AS
 select *
 from fnc_create_Groups_View();
+
