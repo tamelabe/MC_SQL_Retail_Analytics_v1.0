@@ -1,34 +1,4 @@
-SELECT * FROM offersGrowthCheck(2, '12-12-2018 11-11-2020', 4, 1.5, 1.5, 1.5, 1.5);
-
-DROP FUNCTION IF EXISTS offersGrowthCheck(integer, varchar, bigint, real, real, real, real);
-CREATE FUNCTION offersGrowthCheck
-    (calc_method integer, fst_n_lst_date_m1 varchar,
-    transact_cnt_m2 bigint, k_check_incs real, churn_idx real,
-    trans_share_max real, marge_share_avl real)
-    RETURNS table (Customer_ID bigint, Required_Check_Measure real)
---                     Group_Name varchar, Offer_Discount_Depth real)
-    LANGUAGE plpgsql AS
-    $$
-    BEGIN
---      Выбор метода расчета среднего чека
-        IF (calc_method = 1) THEN
-            RETURN QUERY (
-                SELECT ch.Customer_ID, ch.Required_Check_Measure
-                FROM avgCheckM1(fst_n_lst_date_m1, k_check_incs) AS ch
-            );
-        ELSEIF (calc_method = 2) THEN
-            RETURN QUERY (
-                SELECT ch.Customer_ID, ch.Required_Check_Measure
-                FROM avgCheckM2(transact_cnt_m2, k_check_incs) AS ch
-            );
-        ELSE
-            RAISE EXCEPTION
-                'Average check calculation method must be 1 or 2 (1 - per period, 2 - per quantity)';
-        END IF;
-    END;
-    $$;
-
--- Считаем целевое значение среднего чека по первому методу
+-- Calculating aim value of average check by first method
 DROP FUNCTION IF EXISTS avgCheckM1(character varying, real);
 CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar, k_check_incr real)
     RETURNS TABLE (Customer_ID bigint, Required_Check_Measure real)
@@ -59,7 +29,7 @@ CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar, k_check_incr real)
     END;
     $$;
 
--- Считаем целевое значение среднего чека по второму методу
+-- Calculating aim value of average check by second method
 DROP FUNCTION IF EXISTS avgCheckM2(bigint, real);
 CREATE FUNCTION avgCheckM2 (transact_num bigint, k_check_incr real)
     RETURNS TABLE (Customer_ID bigint, Required_Check_Measure real)
@@ -79,7 +49,7 @@ CREATE FUNCTION avgCheckM2 (transact_num bigint, k_check_incr real)
     END;
     $$;
 
--- Получаем даты первой или последней транз-ии в зав-ти от ключа (аргумента)
+-- Getting dates of first or last transactions - depends by key(argument value)
 DROP FUNCTION IF EXISTS getKeyDates(integer);
 CREATE FUNCTION getKeyDates(key integer)
     RETURNS SETOF date
@@ -100,96 +70,87 @@ CREATE FUNCTION getKeyDates(key integer)
     END;
     $$;
 
+--Creation of view with average margin and affinity rank
+DROP VIEW IF EXISTS full_groups_view CASCADE;
+CREATE VIEW full_groups_view AS
+WITH avg AS (
+    SELECT customer_id, group_id, avg(SGM.margin)::real AS Avegage_Margin
+    FROM (SELECT customer_id, group_id, ("Summ_Paid" - "Group_Cost") as margin
+        FROM Groups_View_Support) as SGM
+    GROUP BY 1, 2)
+SELECT gv.*, avg.Avegage_Margin,
+       row_number() over (partition by gv.customer_id order by group_affinity_index DESC) as rank
+FROM groups_view gv
+JOIN avg ON avg.customer_id = gv.customer_id AND avg.group_id = gv.group_id
+ORDER BY customer_id, rank;
 
--- Это все не правильно!
+-- Function for detemine offer discount depth
+DROP FUNCTION IF EXISTS rewardGroupDetermination(real, real, real);
 CREATE FUNCTION rewardGroupDetermination (churn_idx real, trans_share_max real, marge_share_avl real)
-RETURNS TABLE (
-
-              )
+RETURNS TABLE (Customer_ID bigint, Group_ID bigint, Offer_Discount_Depth real)
 LANGUAGE plpgsql AS
     $$
+    DECLARE
+        cust_id bigint := 0;
+        flag bool := false;
+        curr_row record;
+        gv_extended CURSOR FOR (SELECT * FROM full_groups_view);
     BEGIN
-        SELECT DISTINCT customer_id FROM groups_view ORDER BY 1;
-    WITH avg_table AS (
-            SELECT customer_id, group_id, group_affinity_index, group_churn_rate, group_discount_share,
-                   row_number() over (partition by customer_id order by group_affinity_index DESC) as rank,
-                   group_minimum_discount, group_average_discount
-            FROM groups_view
-            WHERE group_churn_rate <= 5 AND group_discount_share < 5),
-        discount AS (
-            SELECT customer_id, group_id,
-                   (CEIL((group_minimum_discount * 100) / 5.0) * 5) AS Offer_Discount_Depth
-            FROM avg_table ORDER BY 1;
-        )
-        SELECT * FROM avg_table WHERE rank = 1 ORDER BY 1 DESC;
-        FROM t1
---         WHERE avg_churn_rate <= churn_idx AND avg_discount < trans_share_max
-        GROUP BY group_id, avg_churn_rate, avg_discount;
-
---         SELECT *
---         FROM t1 WHERE  t1.group_affinity_index <= churn_idx OB;
+    FOR curr_row IN gv_extended LOOP
+        IF (flag = true AND cust_id = curr_row.customer_id) THEN CONTINUE;
+        END IF;
+        IF (curr_row.group_churn_rate <= churn_idx AND
+            curr_row.group_discount_share <= trans_share_max AND
+            curr_row.Avegage_Margin * marge_share_avl / 100 >=
+            CEIL((curr_row.group_minimum_discount * 100) / 5.0) * 0.05 * curr_row.Avegage_Margin) THEN
+                Customer_ID = curr_row.customer_id;
+                Group_ID = curr_row.group_id;
+                Offer_Discount_Depth = CEIL((curr_row.group_minimum_discount * 100) / 5.0) * 5;
+                flag = true;
+                cust_id = Customer_ID;
+                RETURN NEXT;
+        ELSE
+            flag = false;
+        END IF;
+        END LOOP;
     END;
     $$;
 
-
-
-
-
-
-select *    from sorted_group();
-DROP FUNCTION  sorted_group()
-CREATE OR REPLACE FUNCTION sorted_group()
-RETURNS TABLE(customer_id bigint, group_id bigint, group_affinity_index double precision,
-              group_churn_rate double precision, group_discount_share double precision,
-              group_minimum_discount numeric, av_margin double precision) AS $$
+-- Main function
+DROP FUNCTION IF EXISTS offersGrowthCheck(integer, varchar, bigint, real, real, real, real);
+CREATE FUNCTION offersGrowthCheck
+    (calc_method integer, fst_n_lst_date_m1 varchar,
+    transact_cnt_m2 bigint, k_check_incs real, churn_idx real,
+    trans_share_max real, marge_share_avl real)
+    RETURNS table (Customer_ID bigint, Required_Check_Measure real,
+                    Group_Name varchar, Offer_Discount_Depth real)
+    LANGUAGE plpgsql AS
+    $$
     BEGIN
-        RETURN QUERY WITH cte_row_groups AS (SELECT *, RANK() OVER (PARTITION BY groups_view.customer_id ORDER BY groups_view.group_affinity_index DESC) AS number_id,
-                                       AVG(group_margin) OVER (PARTITION BY groups_view.customer_id, groups_view.group_id) AS av_margin
-                                FROM groups_view)
-        SELECT cte_row_groups.customer_id, cte_row_groups.group_id, cte_row_groups.group_affinity_index,
-               cte_row_groups.group_churn_rate, cte_row_groups.group_discount_share,
-               cte_row_groups.group_minimum_discount, cte_row_groups.av_margin
-        FROM cte_row_groups;
+--      Выбор метода расчета среднего чека
+        IF (calc_method = 1) THEN
+            RETURN QUERY
+                SELECT ch.Customer_ID, ch.Required_Check_Measure, gs.group_name, rd.Offer_Discount_Depth
+                FROM avgCheckM1(fst_n_lst_date_m1, k_check_incs) AS ch
+                JOIN rewardGroupDetermination(churn_idx, trans_share_max, marge_share_avl) rd ON
+                    ch.Customer_ID = rd.Customer_ID
+                JOIN groups_sku gs ON gs.group_id = rd.Group_ID
+                ORDER BY Customer_ID;
+        ELSEIF (calc_method = 2) THEN
+            RETURN QUERY
+                SELECT ch.Customer_ID, ch.Required_Check_Measure, gs.group_name, rd.Offer_Discount_Depth
+                FROM avgCheckM2(transact_cnt_m2, k_check_incs) AS ch
+                JOIN rewardGroupDetermination(churn_idx, trans_share_max, marge_share_avl) rd ON
+                    ch.Customer_ID = rd.Customer_ID
+                JOIN groups_sku gs ON gs.group_id = rd.Group_ID
+                ORDER BY Customer_ID;
+        ELSE
+            RAISE EXCEPTION
+                'Average check calculation method must be 1 or 2 (1 - per period, 2 - per quantity)';
+        END IF;
     END;
-$$ LANGUAGE plpgsql;
+    $$;
 
-
-DROP FUNCTION IF EXISTS determination_of_the_group() CASCADE;
-
-CREATE OR REPLACE FUNCTION determination_of_the_group(max_churn_index double precision,
-        max_share_of_discount_transaction double precision, allowable_margin_share double precision)
-RETURNS TABLE (customer_id bigint, Group_id bigint, Offer_Discount_Depth double precision) AS $$
-    DECLARE id bigint := -1;
-            value record;
-            group_cur CURSOR FOR
-                (SELECT *
-                 FROM sorted_group());
-            is_check bool := TRUE;
-    BEGIN
-        FOR value IN group_cur
-            LOOP
-                IF (is_check != TRUE AND id = value.customer_id) THEN
-                    CONTINUE;
-                END IF;
-                IF (value.group_churn_rate <= max_churn_index AND
-                   value.group_discount_share <= max_share_of_discount_transaction) THEN
-                    IF (ABS(value.av_margin * allowable_margin_share / 100) >=
-                        CEIL((value.group_minimum_discount * 100) / 5.0) * 0.05 * ABS(value.av_margin)) THEN
-                        Customer_ID = value.customer_id;
-                        Group_ID = value.group_id;
-                        Offer_Discount_Depth = CEIL((value.group_minimum_discount * 100) / 5.0) * 5;
-                        is_check = FALSE;
-                        id = Customer_ID;
-                        RETURN NEXT;
-                    ELSE
-                        is_check = TRUE;
-                    END IF;
-                ELSE
-                    is_check = TRUE;
-                END IF;
-            END LOOP;
-    END;
-$$ LANGUAGE plpgsql;
-
+-- Check
 SELECT *
-from growth_of_average_check(2, '10.10.2020 10.10.2022', 200,  1.15, 3, 70, 30);
+from offersGrowthCheck(2, '10.10.2018 10.10.2022', 200,  1.15, 3, 70, 30);
