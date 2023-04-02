@@ -13,26 +13,25 @@ RETURNS TABLE
             Offer_Discount_Depth int
         )
 AS $$
--- $cross_selling$
 BEGIN
-RETURN QUERY SELECT DISTINCT MD."Customer_ID", MD.SN,
+RETURN QUERY SELECT DISTINCT MD.customer_id, MD.SN,
     CASE
        WHEN (MD.group_minimum_discount*1.05*100)::integer = 0 THEN 5
        ELSE (MD.group_minimum_discount*1.05*100)::integer
 END
-FROM (SELECT dense_rank() OVER (PARTITION BY VG.customer_id ORDER BY VG.group_id) AS DR, -- ранг текущей строки без пропусков
-first_value(sku.sku_name) OVER ( PARTITION BY VG.customer_id, VG.group_id ORDER BY (VB.sku_retail_price - VB.sku_purchase_price) DESC) AS SN,
-VG.group_id AS GI, *  FROM groups_view AS VG
-  JOIN purchase_history_support AS VB ON VB.customer_id = VG.Customer_ID AND VB.group_id = VG.group_id
-  JOIN customers_view AS VC ON VC."Customer_ID" = VG.customer_id
-  JOIN sku ON sku.group_id = VG.group_id AND sku.sku_id = VB.sku_id WHERE VC.customer_primary_store = VB.transaction_store_id
-  AND VG.group_churn_rate <= max_churn_rate AND VG.group_stability_index < max_stability_index) AS MD
-  WHERE DR <= count_group AND (SELECT count(*) FILTER ( WHERE sku.sku_name = MD.SN)::numeric / count(*) FROM purchase_history_support AS VB
-  JOIN sku ON sku.sku_id = VB.sku_id WHERE VB.customer_id = MD."Customer_ID" AND VB.group_id = MD.GI) < max_sku
+FROM (SELECT dense_rank() OVER (PARTITION BY GV.customer_id ORDER BY GV.group_id) AS DR, -- ранг текущей строки без пропусков
+first_value(sku.sku_name) OVER ( PARTITION BY GV.customer_id, GV.group_id ORDER BY (VB.sku_retail_price - VB.sku_purchase_price) DESC) AS SN,
+GV.group_id AS GI, *  FROM groups_view AS GV
+  JOIN purchase_history_support AS VB ON VB.customer_id = GV.customer_id AND VB.group_id = GV.group_id
+  JOIN customers_view AS CV ON CV.customer_id = GV.customer_id
+  JOIN sku ON sku.group_id = GV.group_id AND sku.sku_id = VB.sku_id WHERE CV.customer_primary_store = VB.transaction_store_id
+  AND GV.group_churn_rate <= max_churn_rate AND GV.group_stability_index < max_stability_index) AS MD
+  WHERE DR <= count_group
+  AND (SELECT count(*) FILTER ( WHERE sku.sku_name = MD.SN)::numeric / count(*) FROM purchase_history_support AS VB
+  JOIN sku ON sku.sku_id = VB.sku_id WHERE (VB.customer_id = MD.customer_id) AND VB.group_id = MD.GI) < max_sku
   AND (MD.sku_retail_price - MD.sku_purchase_price) * max_margin / 100.0 / MD.sku_retail_price >= MD.group_minimum_discount * 1.05;
 END;
 $$
--- $cross_sellingcross_selling$
 LANGUAGE plpgsql;
 
 SELECT * FROM cross_selling(100, 100, 100, 2, 10);
