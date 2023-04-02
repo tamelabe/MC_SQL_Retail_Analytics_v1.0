@@ -1,4 +1,4 @@
-DROP FUNCTION IF EXISTS offersAimedFrequencyV(fst_n_lst_dates varchar, bigint, real, real, real);
+DROP FUNCTION IF EXISTS offersAimedFrequencyV(varchar, bigint, real, real, real);
 -- Main_function
 CREATE FUNCTION offersAimedFrequencyV (fst_n_lst_dates varchar, transactions_num bigint,
                                         churn_idx_max real, disc_trans_share real,
