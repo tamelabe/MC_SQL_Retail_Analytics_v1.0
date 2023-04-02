@@ -135,8 +135,9 @@ CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAU
 
 -- Data import from datasets
 SET DATESTYLE to iso, DMY;
+SET imp_path.txt TO '/Users/aleksei/Documents/GitLab/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 -- SET imp_path.txt TO '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/';
-SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+-- SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 CALL import('Personal_Data', (current_setting('imp_path.txt') || 'Personal_Data.tsv'));
 CALL import('Cards', (current_setting('imp_path.txt') || 'Cards.tsv'));
 CALL import('Transactions', (current_setting('imp_path.txt') || 'Transactions.tsv'));
