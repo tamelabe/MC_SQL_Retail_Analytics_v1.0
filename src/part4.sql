@@ -2,8 +2,7 @@
 DROP FUNCTION IF EXISTS avgCheckM1(character varying, real);
 CREATE FUNCTION avgCheckM1 (fst_n_lst_date_m1 varchar, k_check_incr real)
     RETURNS TABLE (Customer_ID bigint, Required_Check_Measure real)
-    LANGUAGE plpgsql AS
-    $$
+    LANGUAGE plpgsql AS $$
     DECLARE
         lower_date date := split_part(fst_n_lst_date_m1, ' ', 1)::date;
         upper_date date := split_part(fst_n_lst_date_m1, ' ', 2)::date;

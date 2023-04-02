@@ -120,7 +120,8 @@ CREATE OR REPLACE PROCEDURE import(table_name varchar, path text, sep char DEFAU
         ELSE
             EXECUTE concat('COPY ', table_name, ' FROM ''', path, ''' DELIMITER ''', sep, ''' CSV;');
         END IF;
-    END;$$;
+    END;
+    $$;
 
 --Procedure for export
 CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAULT '\t')
@@ -135,8 +136,7 @@ CREATE OR REPLACE PROCEDURE export(table_name varchar, path text, sep char DEFAU
 
 -- Data import from datasets
 SET DATESTYLE to iso, DMY;
-SET imp_path.txt TO '/Users/aleksei/Documents/GitLab/SQL3_RetailAnalitycs_v1.0-2/datasets/';
--- SET imp_path.txt TO '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+SET imp_path.txt TO '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 -- SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 CALL import('Personal_Data', (current_setting('imp_path.txt') || 'Personal_Data.tsv'));
 CALL import('Cards', (current_setting('imp_path.txt') || 'Cards.tsv'));
@@ -149,8 +149,8 @@ CALL import('Stores', (current_setting('imp_path.txt') || 'Stores.tsv'));
 
 --  Data export to specified path
 SET DATESTYLE to iso, DMY;
--- SET exp_path.txt TO '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
-SET exp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
+SET exp_path.txt TO '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
+-- SET exp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/src/tables_data/';
 CALL export('Personal_Data', (current_setting('exp_path.txt') || 'Personal_Data.csv'), ',');
 CALL export('Cards', (current_setting('exp_path.txt') || 'Cards.csv'), ',');
 CALL export('Transactions', (current_setting('exp_path.txt') || 'Transactions.csv'), ',');
