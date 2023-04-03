@@ -1,4 +1,5 @@
 DROP FUNCTION IF EXISTS cross_selling(integer, numeric, numeric, numeric, numeric);
+-- Main_function
 CREATE FUNCTION cross_selling(
     IN count_group integer,
     IN max_churn_rate numeric,

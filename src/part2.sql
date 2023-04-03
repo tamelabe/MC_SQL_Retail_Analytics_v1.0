@@ -10,8 +10,8 @@ CREATE TABLE segments (
 
 -- Data import into Segments table
 SET DATESTYLE to iso, DMY;
-SET imp_path.txt TO '/Users/myrebean/SQL3_RetailAnalitycs_v1.0-2/datasets/';
--- SET imp_path.txt TO '/Users/tamelabe/Documents/repo/SQL3_RetailAnalitycs_v1.0-2/datasets/';
+-- Please, paste path to datasets/ folder
+SET imp_path.txt TO '/Users/aleksei/Documents/GitLab/SQL3_RetailAnalitycs_v1.0-2/datasets/';
 CALL import('segments', (current_setting('imp_path.txt') || 'Segments.tsv'));
 
 --Сustomers view Creation
@@ -257,7 +257,7 @@ CREATE FUNCTION fnc_create_Groups_View(IN int default 1, IN interval default '50
                 Group_Minimum_Discount numeric,
                 Group_Average_Discount float
             )
-AS
+    AS
     $$
 BEGIN
     RETURN QUERY
@@ -325,4 +325,3 @@ DROP VIEW IF EXISTS Groups_View CASCADE;
 CREATE VIEW Groups_View AS
 select *
 from fnc_create_Groups_View();
-
